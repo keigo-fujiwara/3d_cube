@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D ルービックキューブ シミュレーター</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        * { user-select: none; -webkit-user-select: none; }
+        body { margin: 0; overflow: hidden; background-color: #090d16; font-family: 'Inter', system-ui, -apple-system, sans-serif; touch-action: none; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* UI Containers */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Color-coded Face Indicators on Buttons */
+        .face-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-U { background-color: #FFFFFF; box-shadow: 0 0 4px rgba(255,255,255,0.8); }
+        .dot-D { background-color: #FFD500; box-shadow: 0 0 4px rgba(255,213,0,0.8); }
+        .dot-R { background-color: #B71234; box-shadow: 0 0 4px rgba(183,18,52,0.8); }
+        .dot-L { background-color: #FF5800; box-shadow: 0 0 4px rgba(255,88,0,0.8); }
+        .dot-F { background-color: #009B48; box-shadow: 0 0 4px rgba(0,155,72,0.8); }
+        .dot-B { background-color: #0046AD; box-shadow: 0 0 4px rgba(0,70,173,0.8); }
+
+        /* Custom Scrollbar for Guide */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+
+        /* Button Press Active state */
+        .btn-act:active { transform: scale(0.94); }
+    </style>
+</head>
+<body class="text-slate-100 antialiased select-none">
+
+    <div id="canvas-container"></div>
+
+    <!-- UI Layer -->
+    <div class="relative z-10 flex flex-col justify-between h-screen w-screen pointer-events-none p-3 sm:p-5">
+
+        <!-- Top Header & System Menu Bar -->
+        <header class="glass-panel rounded-2xl p-3 sm:px-5 flex flex-wrap items-center justify-between gap-2 pointer-events-auto shadow-2xl">
+            <!-- App Title -->
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+                    3D
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold leading-none tracking-wide text-white">Rubik's Cube</h1>
+                    <p class="text-[10px] sm:text-xs text-slate-400 mt-0.5">ドラッグで自由視点操作</p>
+                </div>
+            </div>
+
+            <!-- Top Action Controls -->
+            <div class="flex items-center flex-wrap gap-1.5 sm:gap-2">
+                <!-- Shuffle -->
+                <button id="btn-shuffle" data-action="shuffle" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-blue-400 border-blue-500/30 transition-all">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    シャッフル
+                </button>
+
+                <!-- Solve / Restore -->
+                <button id="btn-auto-solve" data-action="solve" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-emerald-400 border-emerald-500/30 transition-all">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    自動で完成させる
+                </button>
+
+                <!-- Reset -->
+                <button id="btn-reset" data-action="reset" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-rose-400 border-rose-500/30 transition-all">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    初期状態
+                </button>
+
+                <!-- Speed Setting Toggle -->
+                <button id="btn-toggle-speed" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium p-1.5 sm:px-3 sm:py-1.5 rounded-xl flex items-center text-amber-300 border-amber-500/30 transition-all" title="速度調整">
+                    <svg class="w-4 h-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    <span class="hidden sm:inline">速度設定</span>
+                </button>
+
+                <!-- Guide Modal Toggle -->
+                <button id="btn-toggle-guide" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium p-1.5 sm:px-3 sm:py-1.5 rounded-xl flex items-center text-sky-300 border-sky-500/30 transition-all" title="記号ガイド">
+                    <svg class="w-4 h-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    <span class="hidden sm:inline">記号ガイド</span>
+                </button>
+
+                <!-- Mute Toggle -->
+                <button id="btn-audio-toggle" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-slate-300 border-slate-700 transition-all">
+                    🔊
+                </button>
+            </div>
+        </header>
+
+        <!-- Speed Adjustment Popover Modal -->
+        <div id="speed-popover" class="hidden pointer-events-auto absolute top-20 right-5 glass-panel p-4 rounded-2xl shadow-2xl w-72 z-30 border border-slate-700">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-sm font-bold text-slate-200">回転速度 (1手の所要時間)</span>
+                <span id="speed-value-text" class="text-xs font-mono text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800">300ms</span>
+            </div>
+            <input type="range" id="speed-range" min="50" max="800" step="25" value="300" class="w-full accent-amber-500 cursor-pointer">
+            <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                <span>高速 (50ms)</span>
+                <span>標準 (300ms)</span>
+                <span>ゆっくり (800ms)</span>
+            </div>
+        </div>
+
+        <!-- Guide Modal Window -->
+        <div id="guide-modal" class="hidden pointer-events-auto fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="glass-panel w-full max-w-lg max-h-[85vh] rounded-2xl p-5 shadow-2xl border border-slate-700 flex flex-col">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <h2 class="text-base font-bold text-white flex items-center">
+                        <span class="mr-2">📖</span> 回転記号（標準表記）の意味
+                    </h2>
+                    <button id="btn-close-guide" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
+                </div>
+                
+                <div class="overflow-y-auto my-3 pr-1 text-xs sm:text-sm space-y-3 text-slate-300 leading-relaxed">
+                    <p class="text-slate-400">ルービックキューブの回転記号は、見ている視点からの各面（英語の頭文字）を表します。</p>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
+                            <span class="face-dot dot-U mt-1"></span>
+                            <div>
+                                <span class="font-bold text-white font-mono">U (Up / 上面)</span>
+                                <p class="text-[11px] text-slate-400">上面（白）を時計回りに回転</p>
+                            </div>
+                        </div>
+
+                        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
+                            <span class="face-dot dot-D mt-1"></span>
+                            <div>
+                                <span class="font-bold text-white font-mono">D (Down / 下面)</span>
+                                <p class="text-[11px] text-slate-400">下面（黄）を時計回りに回転</p>
+                            </div>
+                        </div>
+
+                        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
+                            <span class="face-dot dot-R mt-1"></span>
+                            <div>
+                                <span class="font-bold text-white font-mono">R (Right / 右面)</span>
+                                <p class="text-[11px] text-slate-400">右面（赤）を時計回りに回転</p>
+                            </div>
+                        </div>
+
+                        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
+                            <span class="face-dot dot-L mt-1"></span>
+                            <div>
+                                <span class="font-bold text-white font-mono">L (Left / 左面)</span>
+                                <p class="text-[11px] text-slate-400">左面（橙）を時計回りに回転</p>
+                            </div>
+                        </div>
+
+                        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
+                            <span class="face-dot dot-F mt-1"></span>
+                            <div>
+                                <span class="font-bold text-white font-mono">F (Front / 前面)</span>
+                                <p class="text-[11px] text-slate-400">前面（緑）を時計回りに回転</p>
+                            </div>
+                        </div>
+
+                        <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
+                            <span class="face-dot dot-B mt-1"></span>
+                            <div>
+                                <span class="font-bold text-white font-mono">B (Back / 後面)</span>
+                                <p class="text-[11px] text-slate-400">背面（青）を時計回りに回転</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-indigo-950/40 rounded-xl border border-indigo-900/60">
+                        <span class="font-bold text-indigo-300">💡 アポストロフィ ( ' ) について</span>
+                        <p class="text-[11px] text-slate-300 mt-1">
+                            アルファベットの後ろに <code class="bg-indigo-900/60 text-indigo-200 px-1 rounded font-mono">'</code> が付くもの（例: <strong class="text-white">U'</strong>, <strong class="text-white">R'</strong>）は、その面を<strong class="text-indigo-200">反時計回り</strong>に回す操作を表します。
+                        </p>
+                    </div>
+                </div>
+
+                <button id="btn-close-guide-2" class="w-full mt-2 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all">
+                    了解しました
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom Key Bar (Always visible rotation controls) -->
+        <footer class="glass-panel rounded-2xl p-2.5 sm:p-3 pointer-events-auto shadow-2xl border border-slate-800 max-w-2xl mx-auto w-full">
+            <div class="flex flex-col space-y-2">
+                <!-- Clockwise Row -->
+                <div>
+                    <div class="text-[10px] text-slate-400 mb-1 font-semibold tracking-wider flex items-center justify-between px-1">
+                        <span>時計回り (90°)</span>
+                        <span class="text-slate-500">U(上) / D(下) / R(右) / L(左) / F(前) / B(後)</span>
+                    </div>
+                    <div class="grid grid-cols-6 gap-1.5">
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center text-white border-slate-700" data-move="U" onclick="executeUserMove('U')">
+                            <span class="flex items-center"><span class="face-dot dot-U"></span>U</span>
+                            <span class="text-[10px] font-normal text-slate-300 sm:ml-1">上面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center text-white border-slate-700" data-move="D" onclick="executeUserMove('D')">
+                            <span class="flex items-center"><span class="face-dot dot-D"></span>D</span>
+                            <span class="text-[10px] font-normal text-slate-300 sm:ml-1">下面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center text-white border-slate-700" data-move="R" onclick="executeUserMove('R')">
+                            <span class="flex items-center"><span class="face-dot dot-R"></span>R</span>
+                            <span class="text-[10px] font-normal text-slate-300 sm:ml-1">右面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center text-white border-slate-700" data-move="L" onclick="executeUserMove('L')">
+                            <span class="flex items-center"><span class="face-dot dot-L"></span>L</span>
+                            <span class="text-[10px] font-normal text-slate-300 sm:ml-1">左面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center text-white border-slate-700" data-move="F" onclick="executeUserMove('F')">
+                            <span class="flex items-center"><span class="face-dot dot-F"></span>F</span>
+                            <span class="text-[10px] font-normal text-slate-300 sm:ml-1">前面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center text-white border-slate-700" data-move="B" onclick="executeUserMove('B')">
+                            <span class="flex items-center"><span class="face-dot dot-B"></span>B</span>
+                            <span class="text-[10px] font-normal text-slate-300 sm:ml-1">背面</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Counter-Clockwise (Prime) Row -->
+                <div>
+                    <div class="text-[10px] text-slate-400 mb-1 font-semibold tracking-wider flex items-center justify-between px-1">
+                        <span>反時計回り (-90°)</span>
+                        <span class="text-slate-500">U' / D' / R' / L' / F' / B'</span>
+                    </div>
+                    <div class="grid grid-cols-6 gap-1.5">
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-center text-slate-300 border-slate-800" data-move="U'" onclick="executeUserMove('U\'')">
+                            <span class="flex items-center"><span class="face-dot dot-U"></span>U'</span>
+                            <span class="text-[10px] text-slate-400 sm:ml-1">上面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-center text-slate-300 border-slate-800" data-move="D'" onclick="executeUserMove('D\'')">
+                            <span class="flex items-center"><span class="face-dot dot-D"></span>D'</span>
+                            <span class="text-[10px] text-slate-400 sm:ml-1">下面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-center text-slate-300 border-slate-800" data-move="R'" onclick="executeUserMove('R\'')">
+                            <span class="flex items-center"><span class="face-dot dot-R"></span>R'</span>
+                            <span class="text-[10px] text-slate-400 sm:ml-1">右面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-center text-slate-300 border-slate-800" data-move="L'" onclick="executeUserMove('L\'')">
+                            <span class="flex items-center"><span class="face-dot dot-L"></span>L'</span>
+                            <span class="text-[10px] text-slate-400 sm:ml-1">左面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-center text-slate-300 border-slate-800" data-move="F'" onclick="executeUserMove('F\'')">
+                            <span class="flex items-center"><span class="face-dot dot-F"></span>F'</span>
+                            <span class="text-[10px] text-slate-400 sm:ml-1">前面</span>
+                        </button>
+                        <button class="btn-act glass-panel hover:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-center text-slate-300 border-slate-800" data-move="B'" onclick="executeUserMove('B\'')">
+                            <span class="flex items-center"><span class="face-dot dot-B"></span>B'</span>
+                            <span class="text-[10px] text-slate-400 sm:ml-1">背面</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        // Sound Engine using Web Audio API for realistic "シュッ" plastic sliding noise
+        let audioCtx = null;
+        let soundMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSlideSound(isFast = false) {
+            if (soundMuted) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            try {
+                const now = audioCtx.currentTime;
+                const duration = isFast ? 0.05 : 0.09;
+
+                // 1. Generate Noise Buffer for "シュッ" sound
+                const bufferSize = audioCtx.sampleRate * duration;
+                const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                const noiseSource = audioCtx.createBufferSource();
+                noiseSource.buffer = noiseBuffer;
+
+                // 2. Bandpass Filter targeting high plastic friction frequencies (~1800Hz)
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(isFast ? 2200 : 1700, now);
+                filter.Q.setValueAtTime(2.2, now);
+
+                // 3. Envelope
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0.01, now);
+                gainNode.gain.linearRampToValueAtTime(0.28, now + 0.015);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                noiseSource.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                noiseSource.start(now);
+                noiseSource.stop(now + duration);
+
+                // 4. Subtle tiny click sound at the end when snapping
+                if (!isFast) {
+                    const osc = audioCtx.createOscillator();
+                    const oscGain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(220, now + 0.04);
+                    osc.frequency.exponentialRampToValueAtTime(60, now + 0.07);
+
+                    oscGain.gain.setValueAtTime(0.08, now + 0.04);
+                    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+                    osc.connect(oscGain);
+                    oscGain.connect(audioCtx.destination);
+                    osc.start(now + 0.04);
+                    osc.stop(now + 0.07);
+                }
+            } catch (e) {
+                console.debug('Audio playback error:', e);
+            }
+        }
+
+        function playResetChime() {
+            if (soundMuted) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            try {
+                const now = audioCtx.currentTime;
+                const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+
+                    gain.gain.setValueAtTime(0.12, now + idx * 0.06);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.06);
+                    osc.stop(now + idx * 0.06 + 0.3);
+                });
+            } catch (e) {
+                console.debug('Chime error:', e);
+            }
+        }
+    </script>
+
+    <script>
+        // Core Variables
+        let scene, camera, renderer, controls;
+        let allCubies = [];
+        let cubeGroup;
+        let moveDuration = 300; // ms per move
+        
+        // Face Highlight State
+        let highlightedCubies = [];
+
+        // Move history tracking for "完成まで戻す"
+        let moveHistory = [];
+        
+        // Auto-Solve State
+        let isSolving = false;
+        let isSolvePaused = false;
+        let solveCancelled = false;
+
+        // Standard Rubik's Cube Colors
+        const COLORS = {
+            right: 0xB71234,  // Red (+X)
+            left: 0xFF5800,   // Orange (-X)
+            top: 0xFFFFFF,    // White (+Y)
+            bottom: 0xFFD500, // Yellow (-Y)
+            front: 0x009B48,  // Green (+Z)
+            back: 0x0046AD,   // Blue (-Z)
+            core: 0x111111    // Inner core
+        };
+
+        const MOVES = {
+            'U': { axis: 'y', layer: 1, angle: -Math.PI / 2 },
+            'D': { axis: 'y', layer: -1, angle: Math.PI / 2 },
+            'R': { axis: 'x', layer: 1, angle: -Math.PI / 2 },
+            'L': { axis: 'x', layer: -1, angle: Math.PI / 2 },
+            'F': { axis: 'z', layer: 1, angle: -Math.PI / 2 },
+            'B': { axis: 'z', layer: -1, angle: Math.PI / 2 }
+        };
+
+        function initApp() {
+            // Ensure Three.js & OrbitControls are ready
+            if (typeof THREE === 'undefined' || typeof THREE.OrbitControls === 'undefined') {
+                setTimeout(initApp, 50);
+                return;
+            }
+
+            const container = document.getElementById('canvas-container');
+            container.innerHTML = ''; // clear
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#090d16');
+
+            // Camera setup (Initial view distance updated to make the cube slightly smaller)
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(8.5, 7.0, 10.0);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Controls setup
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enablePan = false;
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 3;
+            controls.maxDistance = 20;
+            
+            // Adjust camera target slightly up so the cube stays centered above the bottom controls bar
+            controls.target.set(0, 0.2, 0);
+            controls.update();
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+            scene.add(ambientLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirLight1.position.set(12, 20, 15);
+            scene.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.35);
+            dirLight2.position.set(-12, -15, -12);
+            scene.add(dirLight2);
+
+            // Cube Group
+            cubeGroup = new THREE.Group();
+            scene.add(cubeGroup);
+
+            // Create Cubies
+            buildCubeGeometry();
+
+            // Window Resize Listener
+            window.addEventListener('resize', onWindowResize);
+
+            // Attach hover events to operation buttons
+            setupButtonHoverListeners();
+
+            // Start Render Loop
+            animate();
+        }
+
+        // Highlight cubies of the face or full cube corresponding to hovered buttons
+        function highlightTarget(target, colorHex = 0x445566) {
+            clearFaceHighlight();
+            if (!target || isAnimating || isSolving) return;
+
+            let targets = [];
+            if (target === 'all') {
+                targets = allCubies;
+            } else if (typeof target === 'string') {
+                const base = target[0];
+                const def = MOVES[base];
+                if (def) {
+                    targets = allCubies.filter(c => Math.abs(c.position[def.axis] - def.layer) < 0.1);
+                }
+            }
+
+            highlightedCubies = targets;
+            highlightedCubies.forEach(c => {
+                c.material.forEach(mat => {
+                    mat.emissive.setHex(colorHex);
+                });
+            });
+        }
+
+        function clearFaceHighlight() {
+            if (highlightedCubies.length > 0) {
+                highlightedCubies.forEach(c => {
+                    c.material.forEach(mat => {
+                        mat.emissive.setHex(0x000000);
+                    });
+                });
+                highlightedCubies = [];
+            }
+        }
+
+        function setupButtonHoverListeners() {
+            // 1. All 12 Rotation Move Buttons (Clockwise + Counter-Clockwise)
+            const moveButtons = document.querySelectorAll('[data-move]');
+            moveButtons.forEach(btn => {
+                const moveStr = btn.getAttribute('data-move');
+                if (moveStr) {
+                    const onEnter = () => highlightTarget(moveStr, 0x445566);
+                    const onLeave = () => clearFaceHighlight();
+
+                    btn.addEventListener('pointerenter', onEnter);
+                    btn.addEventListener('pointerleave', onLeave);
+                    btn.addEventListener('touchstart', onEnter, { passive: true });
+                    btn.addEventListener('touchend', onLeave, { passive: true });
+                }
+            });
+
+            // 2. Action System Buttons (Shuffle, Solve, Reset)
+            const actionMap = [
+                { selector: '#btn-shuffle', color: 0x003366 },  // Blue tint
+                { selector: '#btn-auto-solve', color: 0x004422 }, // Emerald tint
+                { selector: '#btn-reset', color: 0x551122 }     // Rose tint
+            ];
+
+            actionMap.forEach(({ selector, color }) => {
+                const btn = document.querySelector(selector);
+                if (btn) {
+                    const onEnter = () => highlightTarget('all', color);
+                    const onLeave = () => clearFaceHighlight();
+
+                    btn.addEventListener('pointerenter', onEnter);
+                    btn.addEventListener('pointerleave', onLeave);
+                    btn.addEventListener('touchstart', onEnter, { passive: true });
+                    btn.addEventListener('touchend', onLeave, { passive: true });
+                }
+            });
+        }
+
+        function buildCubeGeometry() {
+            // Clear existing cubies
+            allCubies.forEach(c => {
+                c.geometry.dispose();
+                c.material.forEach(m => m.dispose());
+                cubeGroup.remove(c);
+            });
+            allCubies = [];
+            cubeGroup.rotation.set(0, 0, 0);
+
+            const spacing = 1.0;
+            const geom = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        const materials = [
+                            new THREE.MeshLambertMaterial({ color: x === 1 ? COLORS.right : COLORS.core }),
+                            new THREE.MeshLambertMaterial({ color: x === -1 ? COLORS.left : COLORS.core }),
+                            new THREE.MeshLambertMaterial({ color: y === 1 ? COLORS.top : COLORS.core }),
+                            new THREE.MeshLambertMaterial({ color: y === -1 ? COLORS.bottom : COLORS.core }),
+                            new THREE.MeshLambertMaterial({ color: z === 1 ? COLORS.front : COLORS.core }),
+                            new THREE.MeshLambertMaterial({ color: z === -1 ? COLORS.back : COLORS.core })
+                        ];
+
+                        const cubie = new THREE.Mesh(geom, materials);
+                        cubie.position.set(x * spacing, y * spacing, z * spacing);
+
+                        // Outline wireframe
+                        const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.99, 0.99, 0.99));
+                        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x050505, linewidth: 2 }));
+                        cubie.add(line);
+
+                        cubeGroup.add(cubie);
+                        allCubies.push(cubie);
+                    }
+                }
+            }
+        }
+
+        let isAnimating = false;
+        const moveQueue = [];
+
+        function executeUserMove(moveStr) {
+            if (isSolving) return; // Prevent manual moves during auto-solve
+            executeMove(moveStr, false, true);
+        }
+
+        function executeMove(moveStr, isFast = false, recordHistory = true) {
+            const base = moveStr[0];
+            const isPrime = moveStr.includes("'");
+            const def = MOVES[base];
+
+            if (!def) return;
+
+            if (recordHistory) {
+                moveHistory.push(moveStr);
+            }
+
+            const angle = isPrime ? -def.angle : def.angle;
+            const duration = isFast ? Math.min(moveDuration, 80) : moveDuration;
+
+            moveQueue.push({ axis: def.axis, layer: def.layer, angle, duration, isFast });
+            processQueue();
+        }
+
+        async function processQueue() {
+            if (isAnimating || moveQueue.length === 0) return;
+
+            clearFaceHighlight(); // Clear highlight during animation
+            isAnimating = true;
+            const item = moveQueue.shift();
+
+            playSlideSound(item.isFast);
+            await animateRotation(item.axis, item.layer, item.angle, item.duration);
+
+            isAnimating = false;
+            processQueue();
+        }
+
+        function animateRotation(axis, layerValue, angle, duration) {
+            return new Promise(resolve => {
+                const activeCubies = allCubies.filter(c => Math.abs(c.position[axis] - layerValue) < 0.1);
+                const pivot = new THREE.Object3D();
+                cubeGroup.add(pivot);
+
+                activeCubies.forEach(c => pivot.attach(c));
+
+                if (duration <= 0) {
+                    pivot.rotation[axis] = angle;
+                    pivot.updateMatrixWorld();
+                    snapCubies(activeCubies, pivot);
+                    cubeGroup.remove(pivot);
+                    resolve();
+                    return;
+                }
+
+                let startTime = null;
+
+                function step(time) {
+                    if (!startTime) startTime = time;
+                    const elapsed = time - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+
+                    // Smooth sine easing
+                    const easeProgress = -(Math.cos(Math.PI * progress) - 1) / 2;
+                    pivot.rotation[axis] = angle * easeProgress;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(step);
+                    } else {
+                        pivot.rotation[axis] = angle;
+                        pivot.updateMatrixWorld();
+                        snapCubies(activeCubies, pivot);
+                        cubeGroup.remove(pivot);
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(step);
+            });
+        }
+
+        function snapCubies(cubies, pivot) {
+            cubies.forEach(c => {
+                cubeGroup.attach(c);
+
+                c.position.x = Math.round(c.position.x);
+                c.position.y = Math.round(c.position.y);
+                c.position.z = Math.round(c.position.z);
+
+                const euler = new THREE.Euler().setFromQuaternion(c.quaternion);
+                const halfPi = Math.PI / 2;
+                euler.x = Math.round(euler.x / halfPi) * halfPi;
+                euler.y = Math.round(euler.y / halfPi) * halfPi;
+                euler.z = Math.round(euler.z / halfPi) * halfPi;
+                c.quaternion.setFromEuler(euler);
+
+                c.updateMatrixWorld();
+            });
+        }
+
+        function getInverseMove(moveStr) {
+            return moveStr.endsWith("'") ? moveStr.slice(0, -1) : moveStr + "'";
+        }
+
+        function getAxis(face) {
+            if (face === 'U' || face === 'D') return 'y';
+            if (face === 'R' || face === 'L') return 'x';
+            if (face === 'F' || face === 'B') return 'z';
+            return '';
+        }
+
+        // Optimizes move sequences by cancelling out inverse operations and combining same-face turns
+        function optimizeMoveSequence(moveArray) {
+            let list = moveArray.map(m => ({
+                face: m[0],
+                count: m.includes("'") ? 3 : 1
+            }));
+
+            let changed = true;
+            while (changed) {
+                changed = false;
+                for (let i = 0; i < list.length; i++) {
+                    if (list[i].count % 4 === 0) continue;
+
+                    for (let j = i + 1; j < list.length; j++) {
+                        if (list[j].count % 4 === 0) continue;
+
+                        if (list[i].face === list[j].face) {
+                            list[i].count = (list[i].count + list[j].count) % 4;
+                            list[j].count = 0;
+                            changed = true;
+                            break;
+                        } else if (getAxis(list[i].face) === getAxis(list[j].face)) {
+                            // Commutative axis (e.g. U and D), continue looking further
+                            continue;
+                        } else {
+                            // Non-commutative axis, stop looking
+                            break;
+                        }
+                    }
+                }
+                list = list.filter(m => m.count % 4 !== 0);
+            }
+
+            const result = [];
+            for (const m of list) {
+                const cnt = m.count % 4;
+                if (cnt === 1) {
+                    result.push(m.face);
+                } else if (cnt === 2) {
+                    result.push(m.face);
+                    result.push(m.face);
+                } else if (cnt === 3) {
+                    result.push(m.face + "'");
+                }
+            }
+            return result;
+        }
+
+        async function startAutoSolve() {
+            if (isSolving || moveHistory.length === 0) return;
+
+            // Prepare inverse move list and eliminate all redundant moves
+            const rawInverseMoves = moveHistory.slice().reverse().map(getInverseMove);
+            const inverseMoves = optimizeMoveSequence(rawInverseMoves);
+
+            if (inverseMoves.length === 0) {
+                moveHistory = [];
+                playResetChime();
+                return;
+            }
+
+            const totalSteps = inverseMoves.length;
+
+            isSolving = true;
+
+            for (let i = 0; i < totalSteps; i++) {
+                const moveStr = inverseMoves[i];
+                executeMove(moveStr, false, false);
+
+                // Wait until current move finishes + padding delay based on speed
+                while (isAnimating || moveQueue.length > 0) {
+                    await new Promise(r => setTimeout(r, 30));
+                }
+                await new Promise(r => setTimeout(r, Math.max(20, moveDuration * 0.2)));
+            }
+
+            moveHistory = []; // Reset history after completion
+            playResetChime();
+
+            isSolving = false;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Speed Setting Popover
+            const speedBtn = document.getElementById('btn-toggle-speed');
+            const speedPopover = document.getElementById('speed-popover');
+            const speedRange = document.getElementById('speed-range');
+            const speedText = document.getElementById('speed-value-text');
+
+            speedBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                speedPopover.classList.toggle('hidden');
+            });
+
+            speedRange.addEventListener('input', (e) => {
+                moveDuration = parseInt(e.target.value, 10);
+                speedText.innerText = `${moveDuration}ms`;
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!speedPopover.contains(e.target) && e.target !== speedBtn) {
+                    speedPopover.classList.add('hidden');
+                }
+            });
+
+            // Guide Modal
+            const guideModal = document.getElementById('guide-modal');
+            const toggleGuideBtn = document.getElementById('btn-toggle-guide');
+            const closeGuideBtn = document.getElementById('btn-close-guide');
+            const closeGuideBtn2 = document.getElementById('btn-close-guide-2');
+
+            const openGuide = () => guideModal.classList.remove('hidden');
+            const closeGuide = () => guideModal.classList.add('hidden');
+
+            toggleGuideBtn.addEventListener('click', openGuide);
+            closeGuideBtn.addEventListener('click', closeGuide);
+            closeGuideBtn2.addEventListener('click', closeGuide);
+
+            // Shuffle Button
+            document.getElementById('btn-shuffle').addEventListener('click', () => {
+                if (isSolving || (isAnimating && moveQueue.length > 5)) return;
+                const faces = ['U', 'D', 'R', 'L', 'F', 'B'];
+                const mods = ['', "'"];
+                for (let i = 0; i < 20; i++) {
+                    const f = faces[Math.floor(Math.random() * faces.length)];
+                    const m = mods[Math.floor(Math.random() * mods.length)];
+                    executeMove(f + m, true, true);
+                }
+            });
+
+            // Reset Button
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                moveQueue.length = 0;
+                moveHistory = [];
+                isAnimating = false;
+                buildCubeGeometry();
+                playResetChime();
+            });
+
+            // Auto Solve Button
+            document.getElementById('btn-auto-solve').addEventListener('click', startAutoSolve);
+
+            // Audio Toggle Button
+            const audioBtn = document.getElementById('btn-audio-toggle');
+            audioBtn.addEventListener('click', () => {
+                soundMuted = !soundMuted;
+                audioBtn.innerText = soundMuted ? '🔇' : '🔊';
+            });
+        });
+
+        // Resize handler
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Render loop
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update();
+            if (renderer && scene && camera) renderer.render(scene, camera);
+        }
+
+        // Safe Initialization Trigger
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            initApp();
+        } else {
+            window.addEventListener('DOMContentLoaded', initApp);
+        }
+    </script>
+</body>
+</html>
