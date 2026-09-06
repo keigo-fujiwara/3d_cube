@@ -4,6 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>3D ルービックキューブ シミュレーター</title>
+    <meta name="description" content="ブラウザで遊べる3Dルービックキューブ・シミュレーター">
+    <meta name="theme-color" content="#090d16">
+    <link rel="icon" type="image/png" href="cube-preview.png">
+    <link rel="apple-touch-icon" href="cube-preview.png">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="3D ルービックキューブ シミュレーター">
+    <meta property="og:description" content="ドラッグとボタン操作で遊べる3Dルービックキューブ">
+    <meta property="og:url" content="https://keigo-fujiwara.github.io/3d_cube/">
+    <meta property="og:image" content="https://keigo-fujiwara.github.io/3d_cube/cube-preview.png">
+    <meta property="og:image:width" content="391">
+    <meta property="og:image:height" content="397">
+    <meta property="og:image:alt" content="完成した3Dルービックキューブ">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="3D ルービックキューブ シミュレーター">
+    <meta name="twitter:description" content="ドラッグとボタン操作で遊べる3Dルービックキューブ">
+    <meta name="twitter:image" content="https://keigo-fujiwara.github.io/3d_cube/cube-preview.png">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js -->
@@ -12,9 +28,18 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     <style>
-        * { user-select: none; -webkit-user-select: none; }
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+        html, body { width: 100%; height: 100%; }
         body { margin: 0; overflow: hidden; background-color: #090d16; font-family: 'Inter', system-ui, -apple-system, sans-serif; touch-action: none; }
-        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #canvas-container { width: 100%; height: 100vh; height: 100dvh; position: fixed; inset: 0; z-index: 1; }
+        #app-shell {
+            height: 100vh;
+            height: 100dvh;
+            padding-top: max(0.75rem, env(safe-area-inset-top));
+            padding-right: max(0.75rem, env(safe-area-inset-right));
+            padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+            padding-left: max(0.75rem, env(safe-area-inset-left));
+        }
 
         /* UI Containers */
         .glass-panel {
@@ -41,6 +66,50 @@
 
         /* Button Press Active state */
         .btn-act:active { transform: scale(0.94); }
+
+        @media (max-width: 639px) {
+            #app-shell {
+                padding-top: max(0.5rem, env(safe-area-inset-top));
+                padding-right: max(0.5rem, env(safe-area-inset-right));
+                padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+                padding-left: max(0.5rem, env(safe-area-inset-left));
+            }
+            #app-header { flex-wrap: nowrap; gap: 0.375rem; padding: 0.5rem; border-radius: 0.75rem; }
+            #app-title { flex: 0 0 auto; }
+            #app-title > div:first-child { width: 1.75rem; height: 1.75rem; border-radius: 0.5rem; font-size: 0.75rem; }
+            #app-title h1 { font-size: 0.75rem; white-space: nowrap; }
+            #app-title p { display: none; }
+            #action-controls { flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-end; gap: 0.25rem; min-width: 0; }
+            #action-controls button { width: 1.875rem; height: 1.875rem; flex: 0 0 auto; justify-content: center; padding: 0; border-radius: 0.5rem; }
+            #action-controls svg { width: 0.875rem; height: 0.875rem; margin-right: 0; }
+            #action-controls .action-label { display: none; }
+            #speed-popover {
+                top: max(3.75rem, calc(env(safe-area-inset-top) + 3.25rem));
+                right: max(0.5rem, env(safe-area-inset-right));
+                left: max(0.5rem, env(safe-area-inset-left));
+                width: auto;
+            }
+            #guide-modal { padding: max(0.5rem, env(safe-area-inset-top)) 0.5rem max(0.5rem, env(safe-area-inset-bottom)); }
+            #guide-modal > div { max-height: calc(100dvh - 1rem); padding: 0.75rem; }
+            #control-panel { padding: 0.375rem; border-radius: 0.75rem; }
+            #control-panel > div { gap: 0.25rem; }
+            #control-panel .move-caption { margin-bottom: 0.125rem; font-size: 0.5625rem; }
+            #control-panel .move-caption span:last-child { display: none; }
+            #control-panel .move-grid { gap: 0.25rem; }
+            #control-panel [data-move] { min-height: 2.25rem; padding: 0.25rem 0.125rem; border-radius: 0.5rem; }
+            #control-panel [data-move] > span:last-child { display: none; }
+            #control-panel .face-dot { width: 0.4375rem; height: 0.4375rem; margin-right: 0.1875rem; }
+        }
+
+        @media (max-width: 359px) {
+            #app-title h1 { display: none; }
+        }
+
+        @media (max-height: 500px) and (orientation: landscape) {
+            #app-title h1, #app-title p { display: none; }
+            #control-panel > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+            #control-panel [data-move] { min-height: 1.875rem; padding-top: 0.125rem; padding-bottom: 0.125rem; }
+        }
     </style>
 </head>
 <body class="text-slate-100 antialiased select-none">
@@ -48,12 +117,12 @@
     <div id="canvas-container"></div>
 
     <!-- UI Layer -->
-    <div class="relative z-10 flex flex-col justify-between h-screen w-screen pointer-events-none p-3 sm:p-5">
+    <div id="app-shell" class="relative z-10 flex flex-col justify-between w-screen pointer-events-none sm:p-5">
 
         <!-- Top Header & System Menu Bar -->
-        <header class="glass-panel rounded-2xl p-3 sm:px-5 flex flex-wrap items-center justify-between gap-2 pointer-events-auto shadow-2xl">
+        <header id="app-header" class="glass-panel rounded-2xl p-3 sm:px-5 flex flex-wrap items-center justify-between gap-2 pointer-events-auto shadow-2xl">
             <!-- App Title -->
-            <div class="flex items-center space-x-2">
+            <div id="app-title" class="flex items-center space-x-2">
                 <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
                     3D
                 </div>
@@ -64,39 +133,39 @@
             </div>
 
             <!-- Top Action Controls -->
-            <div class="flex items-center flex-wrap gap-1.5 sm:gap-2">
+            <div id="action-controls" class="flex items-center flex-wrap gap-1.5 sm:gap-2">
                 <!-- Shuffle -->
-                <button id="btn-shuffle" data-action="shuffle" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-blue-400 border-blue-500/30 transition-all">
+                <button id="btn-shuffle" data-action="shuffle" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-blue-400 border-blue-500/30 transition-all" aria-label="シャッフル" title="シャッフル">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    シャッフル
+                    <span class="action-label">シャッフル</span>
                 </button>
 
                 <!-- Solve / Restore -->
-                <button id="btn-auto-solve" data-action="solve" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-emerald-400 border-emerald-500/30 transition-all">
+                <button id="btn-auto-solve" data-action="solve" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-emerald-400 border-emerald-500/30 transition-all" aria-label="自動で完成させる" title="自動で完成させる">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    自動で完成させる
+                    <span class="action-label">自動で完成させる</span>
                 </button>
 
                 <!-- Reset -->
-                <button id="btn-reset" data-action="reset" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-rose-400 border-rose-500/30 transition-all">
+                <button id="btn-reset" data-action="reset" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium px-3 py-1.5 rounded-xl flex items-center text-rose-400 border-rose-500/30 transition-all" aria-label="初期状態に戻す" title="初期状態に戻す">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    初期状態
+                    <span class="action-label">初期状態</span>
                 </button>
 
                 <!-- Speed Setting Toggle -->
                 <button id="btn-toggle-speed" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium p-1.5 sm:px-3 sm:py-1.5 rounded-xl flex items-center text-amber-300 border-amber-500/30 transition-all" title="速度調整">
                     <svg class="w-4 h-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                    <span class="hidden sm:inline">速度設定</span>
+                    <span class="action-label hidden sm:inline">速度設定</span>
                 </button>
 
                 <!-- Guide Modal Toggle -->
                 <button id="btn-toggle-guide" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm font-medium p-1.5 sm:px-3 sm:py-1.5 rounded-xl flex items-center text-sky-300 border-sky-500/30 transition-all" title="記号ガイド">
                     <svg class="w-4 h-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                    <span class="hidden sm:inline">記号ガイド</span>
+                    <span class="action-label hidden sm:inline">記号ガイド</span>
                 </button>
 
                 <!-- Mute Toggle -->
-                <button id="btn-audio-toggle" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-slate-300 border-slate-700 transition-all">
+                <button id="btn-audio-toggle" class="btn-act glass-panel hover:bg-slate-800 text-xs sm:text-sm p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-slate-300 border-slate-700 transition-all" aria-label="効果音を切り替える" title="効果音を切り替える">
                     🔊
                 </button>
             </div>
@@ -194,15 +263,15 @@
         </div>
 
         <!-- Bottom Key Bar (Always visible rotation controls) -->
-        <footer class="glass-panel rounded-2xl p-2.5 sm:p-3 pointer-events-auto shadow-2xl border border-slate-800 max-w-2xl mx-auto w-full">
+        <footer id="control-panel" class="glass-panel rounded-2xl p-2.5 sm:p-3 pointer-events-auto shadow-2xl border border-slate-800 max-w-2xl mx-auto w-full">
             <div class="flex flex-col space-y-2">
                 <!-- Clockwise Row -->
                 <div>
-                    <div class="text-[10px] text-slate-400 mb-1 font-semibold tracking-wider flex items-center justify-between px-1">
+                    <div class="move-caption text-[10px] text-slate-400 mb-1 font-semibold tracking-wider flex items-center justify-between px-1">
                         <span>時計回り (90°)</span>
                         <span class="text-slate-500">U(上) / D(下) / R(右) / L(左) / F(前) / B(後)</span>
                     </div>
-                    <div class="grid grid-cols-6 gap-1.5">
+                    <div class="move-grid grid grid-cols-6 gap-1.5">
                         <button class="btn-act glass-panel hover:bg-slate-800 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center text-white border-slate-700" data-move="U" onclick="executeUserMove('U')">
                             <span class="flex items-center"><span class="face-dot dot-U"></span>U</span>
                             <span class="text-[10px] font-normal text-slate-300 sm:ml-1">上面</span>
@@ -232,11 +301,11 @@
 
                 <!-- Counter-Clockwise (Prime) Row -->
                 <div>
-                    <div class="text-[10px] text-slate-400 mb-1 font-semibold tracking-wider flex items-center justify-between px-1">
+                    <div class="move-caption text-[10px] text-slate-400 mb-1 font-semibold tracking-wider flex items-center justify-between px-1">
                         <span>反時計回り (-90°)</span>
                         <span class="text-slate-500">U' / D' / R' / L' / F' / B'</span>
                     </div>
-                    <div class="grid grid-cols-6 gap-1.5">
+                    <div class="move-grid grid grid-cols-6 gap-1.5">
                         <button class="btn-act glass-panel hover:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium flex flex-col sm:flex-row items-center justify-center text-slate-300 border-slate-800" data-move="U'" onclick="executeUserMove('U\'')">
                             <span class="flex items-center"><span class="face-dot dot-U"></span>U'</span>
                             <span class="text-[10px] text-slate-400 sm:ml-1">上面</span>
@@ -424,7 +493,7 @@
             scene.background = new THREE.Color('#090d16');
 
             // Camera setup (Initial view distance updated to make the cube slightly smaller)
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera = new THREE.PerspectiveCamera(getResponsiveFov(), window.innerWidth / window.innerHeight, 0.1, 100);
             camera.position.set(8.5, 7.0, 10.0);
 
             // Renderer setup
@@ -849,9 +918,16 @@
         });
 
         // Resize handler
+        function getResponsiveFov() {
+            if (window.innerHeight <= 500 && window.innerWidth > window.innerHeight) return 58;
+            if (window.innerWidth <= 639) return 52;
+            return 45;
+        }
+
         function onWindowResize() {
             if (!camera || !renderer) return;
             camera.aspect = window.innerWidth / window.innerHeight;
+            camera.fov = getResponsiveFov();
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
